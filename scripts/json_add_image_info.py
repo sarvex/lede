@@ -22,12 +22,11 @@ if not image_file.is_file():
 def get_titles():
     titles = []
     for prefix in ["", "ALT0_", "ALT1_", "ALT2_"]:
-        title = {}
-        for var in ["vendor", "model", "variant"]:
-            if getenv("DEVICE_{}{}".format(prefix, var.upper())):
-                title[var] = getenv("DEVICE_{}{}".format(prefix, var.upper()))
-
-        if title:
+        if title := {
+            var: getenv(f"DEVICE_{prefix}{var.upper()}")
+            for var in ["vendor", "model", "variant"]
+            if getenv(f"DEVICE_{prefix}{var.upper()}")
+        }:
             titles.append(title)
 
     if not titles:
@@ -41,7 +40,7 @@ image_hash = hashlib.sha256(image_file.read_bytes()).hexdigest()
 
 image_info = {
     "metadata_version": 1,
-    "target": "{}/{}".format(getenv("TARGET"), getenv("SUBTARGET")),
+    "target": f'{getenv("TARGET")}/{getenv("SUBTARGET")}',
     "version_code": getenv("VERSION_CODE"),
     "version_number": getenv("VERSION_NUMBER"),
     "source_date_epoch": getenv("SOURCE_DATE_EPOCH"),

@@ -33,10 +33,10 @@ verbose = 0
 
 def check_python():
     info = sys.version_info
-    if info[0] == 2 and not info[1] >= 6:
+    if info[0] == 2 and info[1] < 6:
         print('Python 2.6+ required')
         sys.exit(1)
-    elif info[0] == 3 and not info[1] >= 3:
+    elif info[0] == 3 and info[1] < 3:
         print('Python 3.3+ required')
         sys.exit(1)
     elif info[0] not in [2, 3]:
@@ -67,11 +67,11 @@ def __version():
 
 
 def print_shadowsocks():
-    print('ShadowsocksR %s' % __version())
+    print(f'ShadowsocksR {__version()}')
 
 
 def log_shadowsocks_version():
-    logging.info('ShadowsocksR %s' % __version())
+    logging.info(f'ShadowsocksR {__version()}')
 
 
 def find_config():
@@ -112,8 +112,9 @@ def check_config(config, is_local):
     if config.get('local_address', '') in [b'0.0.0.0']:
         logging.warning('warning: local set to listen on 0.0.0.0, it\'s not safe')
     if config.get('server', '') in ['127.0.0.1', 'localhost']:
-        logging.warning('warning: server set to listen on %s:%s, are you sure?' %
-                        (to_str(config['server']), config['server_port']))
+        logging.warning(
+            f"warning: server set to listen on {to_str(config['server'])}:{config['server_port']}, are you sure?"
+        )
     if config.get('timeout', 300) < 100:
         logging.warning('warning: your timeout %d seems too short' %
                         int(config.get('timeout')))
@@ -124,10 +125,9 @@ def check_config(config, is_local):
         logging.error('DON\'T USE DEFAULT PASSWORD! Please change it in your '
                       'config.json!')
         sys.exit(1)
-    if config.get('user', None) is not None:
-        if os.name != 'posix':
-            logging.error('user can be used only on Unix')
-            sys.exit(1)
+    if config.get('user', None) is not None and os.name != 'posix':
+        logging.error('user can be used only on Unix')
+        sys.exit(1)
 
     encrypt.try_cipher(config['password'], config['method'])
 
@@ -164,7 +164,7 @@ def get_config(is_local):
             config_path = find_config()
 
         if config_path:
-            logging.debug('loading config from %s' % config_path)
+            logging.debug(f'loading config from {config_path}')
             with open(config_path, 'rb') as f:
                 try:
                     config = parse_json_in_str(remove_comment(f.read().decode('utf8')))
@@ -426,14 +426,12 @@ class JSFormat:
             return to_str(chr(ch))
         elif self.state == 2:
             self.state = 1
-            if ch == ord('"'):
-                return to_str(chr(ch))
-            return "\\" + to_str(chr(ch))
+            return to_str(chr(ch)) if ch == ord('"') else "\\" + to_str(chr(ch))
         elif self.state == 3:
             if ch == ord('/'):
                 self.state = 4
             else:
-                return "/" + to_str(chr(ch))
+                return f"/{to_str(chr(ch))}"
         elif self.state == 4:
             if ch == ord('\n'):
                 self.state = 0

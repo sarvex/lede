@@ -125,15 +125,12 @@ def create_output(args):
 	in_st = os.stat(args.input_file)
 	in_size = in_st.st_size
 
-	in_f = open(args.input_file, 'r+b')
-	in_bytes = in_f.read(in_size)
-	in_f.close()
-
+	with open(args.input_file, 'r+b') as in_f:
+		in_bytes = in_f.read(in_size)
 	tag = create_tag(args, in_bytes, in_size)
 
-	out_f = open(args.output_file, 'w+b')
-	out_f.write(tag)
-	out_f.close()
+	with open(args.output_file, 'w+b') as out_f:
+		out_f.write(tag)
 
 def main():
 	global args

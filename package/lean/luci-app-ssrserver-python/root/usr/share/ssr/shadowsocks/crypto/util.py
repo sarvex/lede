@@ -33,7 +33,7 @@ def find_library_nt(name):
             results.append(fname)
         if fname.lower().endswith(".dll"):
             continue
-        fname = fname + ".dll"
+        fname = f"{fname}.dll"
         if os.path.isfile(fname):
             results.append(fname)
     return results
@@ -50,16 +50,12 @@ def find_library(possible_lib_names, search_symbol, library_name):
 
     lib_names = []
     for lib_name in possible_lib_names:
-        lib_names.append(lib_name)
-        lib_names.append('lib' + lib_name)
-
+        lib_names.extend((lib_name, f'lib{lib_name}'))
     for name in lib_names:
         if os.name == "nt":
             paths.extend(find_library_nt(name))
-        else:
-            path = ctypes.util.find_library(name)
-            if path:
-                paths.append(path)
+        elif path := ctypes.util.find_library(name):
+            paths.append(path)
 
     if not paths:
         # We may get here when find_library fails because, for example,
@@ -69,14 +65,14 @@ def find_library(possible_lib_names, search_symbol, library_name):
 
         for name in lib_names:
             patterns = [
-                '/usr/local/lib*/lib%s.*' % name,
-                '/usr/lib*/lib%s.*' % name,
-                'lib%s.*' % name,
-                '%s.dll' % name]
+                f'/usr/local/lib*/lib{name}.*',
+                f'/usr/lib*/lib{name}.*',
+                f'lib{name}.*',
+                f'{name}.dll',
+            ]
 
             for pat in patterns:
-                files = glob.glob(pat)
-                if files:
+                if files := glob.glob(pat):
                     paths.extend(files)
     for path in paths:
         try:

@@ -26,8 +26,6 @@ import time
 import argparse
 from subprocess import Popen, PIPE
 
-python = ['python']
-
 default_url = 'http://localhost/'
 
 parser = argparse.ArgumentParser(description='test Shadowsocks')
@@ -43,9 +41,7 @@ parser.add_argument('--dns', type=str, default='8.8.8.8')
 
 config = parser.parse_args()
 
-if config.with_coverage:
-    python = ['coverage', 'run', '-p']
-
+python = ['coverage', 'run', '-p'] if config.with_coverage else ['python']
 client_args = python + ['shadowsocks/local.py', '-v']
 server_args = python + ['shadowsocks/server.py', '-v']
 
@@ -110,8 +106,7 @@ try:
                         '-m', '15', '--connect-timeout', '10'],
                        stdin=PIPE, stdout=PIPE, stderr=PIPE, close_fds=True)
             if p3 is not None:
-                fdset.append(p3.stdout)
-                fdset.append(p3.stderr)
+                fdset.extend((p3.stdout, p3.stderr))
                 stage = 2
             else:
                 sys.exit(1)
@@ -120,20 +115,24 @@ try:
             fdset.remove(p3.stdout)
             fdset.remove(p3.stderr)
             r = p3.wait()
-            if config.should_fail:
-                if r == 0:
-                    sys.exit(1)
-            else:
-                if r != 0:
-                    sys.exit(1)
+            if (
+                config.should_fail
+                and r == 0
+                or not config.should_fail
+                and r != 0
+            ):
+                sys.exit(1)
             if config.tcp_only:
                 break
-            p4 = Popen(['socksify', 'dig', '@%s' % config.dns,
-                        'www.google.com'],
-                       stdin=PIPE, stdout=PIPE, stderr=PIPE, close_fds=True)
+            p4 = Popen(
+                ['socksify', 'dig', f'@{config.dns}', 'www.google.com'],
+                stdin=PIPE,
+                stdout=PIPE,
+                stderr=PIPE,
+                close_fds=True,
+            )
             if p4 is not None:
-                fdset.append(p4.stdout)
-                fdset.append(p4.stderr)
+                fdset.extend((p4.stdout, p4.stderr))
                 stage = 4
             else:
                 sys.exit(1)

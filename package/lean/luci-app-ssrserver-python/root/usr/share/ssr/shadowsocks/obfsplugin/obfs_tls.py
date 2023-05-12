@@ -46,10 +46,7 @@ obfs_map = {
 }
 
 def match_begin(str1, str2):
-    if len(str1) >= len(str2):
-        if str1[:len(str2)] == str2:
-            return True
-    return False
+    return len(str1) >= len(str2) and str1[:len(str2)] == str2
 
 class obfs_auth_data(object):
     def __init__(self):
@@ -144,7 +141,7 @@ class tls_ticket_auth(plain.plain):
             self.recv_buffer += buf
             while len(self.recv_buffer) > 5:
                 if ord(self.recv_buffer[0]) != 0x17:
-                    logging.info("data = %s" % (binascii.hexlify(self.recv_buffer)))
+                    logging.info(f"data = {binascii.hexlify(self.recv_buffer)}")
                     raise Exception('server_decode appdata error')
                 size = struct.unpack('>H', self.recv_buffer[3:5])[0]
                 if len(self.recv_buffer) < size + 5:
@@ -209,7 +206,7 @@ class tls_ticket_auth(plain.plain):
             self.recv_buffer += buf
             while len(self.recv_buffer) > 5:
                 if ord(self.recv_buffer[0]) != 0x17 or ord(self.recv_buffer[1]) != 0x3 or ord(self.recv_buffer[2]) != 0x3:
-                    logging.info("data = %s" % (binascii.hexlify(self.recv_buffer)))
+                    logging.info(f"data = {binascii.hexlify(self.recv_buffer)}")
                     raise Exception('server_decode appdata error')
                 size = struct.unpack('>H', self.recv_buffer[3:5])[0]
                 if len(self.recv_buffer) < size + 5:
@@ -286,14 +283,14 @@ class tls_ticket_auth(plain.plain):
             except:
                 pass
         if self.max_time_dif > 0 and (time_dif < -self.max_time_dif or time_dif > self.max_time_dif \
-                or common.int32(utc_time - self.server_info.data.startup_time) < -self.max_time_dif / 2):
+                    or common.int32(utc_time - self.server_info.data.startup_time) < -self.max_time_dif / 2):
             logging.info("tls_auth wrong time")
             return self.decode_error_return(ogn_buf)
         if sha1 != verifyid[22:]:
             logging.info("tls_auth wrong sha1")
             return self.decode_error_return(ogn_buf)
         if self.server_info.data.client_data.get(verifyid[:22]):
-            logging.info("replay attack detect, id = %s" % (binascii.hexlify(verifyid)))
+            logging.info(f"replay attack detect, id = {binascii.hexlify(verifyid)}")
             return self.decode_error_return(ogn_buf)
         self.server_info.data.client_data.sweep()
         self.server_info.data.client_data[verifyid[:22]] = sessionid

@@ -230,16 +230,14 @@ class UDPRelay(object):
         return (self.server_transfer_ul, self.server_transfer_dl)
 
     def get_users_ud(self):
-        ret = (self.server_user_transfer_ul.copy(), self.server_user_transfer_dl.copy())
-        return ret
+        return self.server_user_transfer_ul.copy(), self.server_user_transfer_dl.copy()
 
     def _update_users(self, protocol_param, acl):
         if protocol_param is None:
             protocol_param = self._config['protocol_param']
         param = common.to_bytes(protocol_param).split(b'#')
         if len(param) == 2:
-            user_list = param[1].split(b',')
-            if user_list:
+            if user_list := param[1].split(b','):
                 for user in user_list:
                     items = user.split(b':')
                     if len(items) == 2:
@@ -298,8 +296,9 @@ class UDPRelay(object):
         if hasattr(client, 'close'):
             if not self._is_local:
                 if client.fileno() in self._client_fd_to_server_addr:
-                    logging.debug('close_client: %s' %
-                                 (self._client_fd_to_server_addr[client.fileno()],))
+                    logging.debug(
+                        f'close_client: {self._client_fd_to_server_addr[client.fileno()]}'
+                    )
                 else:
                     client.info('close_client')
             self._sockets.remove(client.fileno())
@@ -308,8 +307,7 @@ class UDPRelay(object):
             client.close()
         else:
             # just an address
-            client.info('close_client pass %s' % client)
-            pass
+            client.info(f'close_client pass {client}')
 
     def _handel_protocol_error(self, client_address, ogn_data):
         #raise Exception('can not parse header')
@@ -328,11 +326,11 @@ class UDPRelay(object):
         if bind_addr:
             local_addrs = socket.getaddrinfo(bind_addr, 0, 0, socket.SOCK_DGRAM, socket.SOL_UDP)
             if local_addrs[0][0] == af:
-                logging.debug("bind %s" % (bind_addr,))
+                logging.debug(f"bind {bind_addr}")
                 try:
                     sock.bind((bind_addr, 0))
                 except Exception as e:
-                    logging.warn("bind %s fail" % (bind_addr,))
+                    logging.warn(f"bind {bind_addr} fail")
 
     def _handle_server(self):
         server = self._server_socket
@@ -411,25 +409,26 @@ class UDPRelay(object):
             if client_pair is None:
                 client_pair = self._cache_dns_client.get(key, None)
             if client_pair is None:
-                if self._forbidden_iplist:
-                    if common.to_str(sa[0]) in self._forbidden_iplist:
-                        logging.debug('IP %s is in forbidden list, drop' % common.to_str(sa[0]))
-                        # drop
-                        return
-                if self._forbidden_portset:
-                    if sa[1] in self._forbidden_portset:
-                        logging.debug('Port %d is in forbidden list, reject' % sa[1])
-                        # drop
-                        return
+                if (
+                    self._forbidden_iplist
+                    and common.to_str(sa[0]) in self._forbidden_iplist
+                ):
+                    logging.debug(f'IP {common.to_str(sa[0])} is in forbidden list, drop')
+                    # drop
+                    return
+                if self._forbidden_portset and sa[1] in self._forbidden_portset:
+                    logging.debug('Port %d is in forbidden list, reject' % sa[1])
+                    # drop
+                    return
                 client = socket.socket(af, socktype, proto)
                 client_uid = uid
                 client.setblocking(False)
                 self._socket_bind_addr(client, af)
-                is_dns = False
-                if len(data) > header_length + 13 and data[header_length + 4 : header_length + 12] == b"\x00\x01\x00\x00\x00\x00\x00\x00":
-                    is_dns = True
-                else:
-                    pass
+                is_dns = (
+                    len(data) > header_length + 13
+                    and data[header_length + 4 : header_length + 12]
+                    == b"\x00\x01\x00\x00\x00\x00\x00\x00"
+                )
                 if sa[1] == 53 and is_dns: #DNS
                     logging.debug("DNS query %s from %s:%d" % (common.to_str(sa[0]), r_addr[0], r_addr[1]))
                     self._cache_dns_client[key] = (client, uid)
@@ -475,9 +474,7 @@ class UDPRelay(object):
         except IOError as e:
             err = eventloop.errno_from_exception(e)
             logging.warning('IOError sendto %s:%d by user %d' % (server_addr, server_port, user_id))
-            if err in (errno.EINPROGRESS, errno.EAGAIN):
-                pass
-            else:
+            if err not in (errno.EINPROGRESS, errno.EAGAIN):
                 shell.print_exception(e)
 
     def _handle_client(self, sock):
@@ -538,10 +535,6 @@ class UDPRelay(object):
                 logging.debug("remove dns client %s:%d" % (client_addr[0][0], client_addr[0][1]))
                 del self._cache_dns_client[key]
                 self._close_client(client_dns_pair[0])
-        else:
-            # this packet is from somewhere else we know
-            # simply drop that packet
-            pass
 
     def write_to_server_socket(self, data, addr):
         uncomplete = False
@@ -558,9 +551,7 @@ class UDPRelay(object):
         except (OSError, IOError) as e:
             error_no = eventloop.errno_from_exception(e)
             uncomplete = True
-            if error_no in (errno.EWOULDBLOCK,):
-                pass
-            else:
+            if error_no not in (errno.EWOULDBLOCK,):
                 shell.print_exception(e)
                 return False
         #if uncomplete and data is not None and retry < 3:
@@ -617,13 +608,11 @@ class UDPRelay(object):
                 shell.print_exception(e)
                 if self._config['verbose']:
                     traceback.print_exc()
+        elif sock:
+            if handler := self._fd_to_handlers.get(fd, None):
+                handler.handle_event(sock, event)
         else:
-            if sock:
-                handler = self._fd_to_handlers.get(fd, None)
-                if handler:
-                    handler.handle_event(sock, event)
-            else:
-                logging.warn('poll removed fd')
+            logging.warn('poll removed fd')
 
     def handle_periodic(self):
         if self._closed:

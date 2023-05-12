@@ -27,15 +27,11 @@ import re
 from shadowsocks import lru_cache
 
 def compat_ord(s):
-    if type(s) == int:
-        return s
-    return _ord(s)
+    return s if type(s) == int else _ord(s)
 
 
 def compat_chr(d):
-    if bytes == str:
-        return _chr(d)
-    return bytes([d])
+    return _chr(d) if bytes == str else bytes([d])
 
 
 _ord = ord
@@ -46,27 +42,18 @@ chr = compat_chr
 connect_log = logging.debug
 
 def to_bytes(s):
-    if bytes != str:
-        if type(s) == str:
-            return s.encode('utf-8')
-    return s
+    return s.encode('utf-8') if bytes != str and type(s) == str else s
 
 
 def to_str(s):
-    if bytes != str:
-        if type(s) == bytes:
-            return s.decode('utf-8')
-    return s
+    return s.decode('utf-8') if bytes != str and type(s) == bytes else s
 
 def int32(x):
     if x > 0xFFFFFFFF or x < 0:
         x &= 0xFFFFFFFF
     if x > 0x7FFFFFFF:
         x = int(0x100000000 - x)
-        if x < 0x80000000:
-            return -x
-        else:
-            return -2147483648
+        return -x if x < 0x80000000 else -2147483648
     return x
 
 def inet_ntop(family, ipstr):
@@ -123,7 +110,7 @@ def is_ip(address):
 
 def match_regex(regex, text):
     regex = re.compile(regex)
-    for item in regex.findall(text):
+    for _ in regex.findall(text):
         return True
     return False
 
@@ -149,10 +136,7 @@ def pack_addr(address):
     for family in (socket.AF_INET, socket.AF_INET6):
         try:
             r = socket.inet_pton(family, address_str)
-            if family == socket.AF_INET6:
-                return b'\x04' + r
-            else:
-                return b'\x01' + r
+            return b'\x04' + r if family == socket.AF_INET6 else b'\x01' + r
         except (TypeError, ValueError, OSError, IOError):
             pass
     if len(address) > 255:
@@ -205,7 +189,7 @@ def parse_header(data):
     dest_addr = None
     dest_port = None
     header_length = 0
-    connecttype = (addrtype & 0x8) and 1 or 0
+    connecttype = 1 if addrtype & 0x8 else 0
     addrtype &= ~0x8
     if addrtype == ADDRTYPE_IPV4:
         if len(data) >= 7:
@@ -264,7 +248,7 @@ class IPNetwork(object):
             hi, lo = struct.unpack("!QQ", inet_pton(addr_family, block[0]))
             ip = (hi << 64) | lo
         else:
-            raise Exception("Not a valid CIDR notation: %s" % addr)
+            raise Exception(f"Not a valid CIDR notation: {addr}")
         if len(block) is 1:
             prefix_size = 0
             while (ip & 1) == 0 and ip is not 0:
@@ -276,7 +260,7 @@ class IPNetwork(object):
             prefix_size = addr_len - int(block[1])
             ip >>= prefix_size
         else:
-            raise Exception("Not a valid CIDR notation: %s" % addr)
+            raise Exception(f"Not a valid CIDR notation: {addr}")
         if addr_family is socket.AF_INET:
             self._network_list_v4.append((ip, prefix_size))
         else:
@@ -319,10 +303,8 @@ class PortRange(object):
                 elif len(int_range) == 2:
                     int_range[0] = int(int_range[0])
                     int_range[1] = int(int_range[1])
-                    if int_range[0] < 0:
-                        int_range[0] = 0
-                    if int_range[1] > 65535:
-                        int_range[1] = 65535
+                    int_range[0] = max(int_range[0], 0)
+                    int_range[1] = min(int_range[1], 65535)
                     i = int_range[0]
                     while i <= int_range[1]:
                         self.range.add(i)
@@ -361,13 +343,12 @@ class UDPAsyncDNSHandler(object):
 
     def _handle_dns_resolved(self, result, error):
         if error:
-            logging.error("%s when resolve DNS" % (error,)) #drop
+            logging.error(f"{error} when resolve DNS")
             return self.call_back(error, self.remote_addr, None, self.params)
         if result:
-            ip = result[1]
-            if ip:
+            if ip := result[1]:
                 return self.call_back("", self.remote_addr, ip, self.params)
-        logging.warning("can't resolve %s" % (self.remote_addr,))
+        logging.warning(f"can't resolve {self.remote_addr}")
         return self.call_back("fail to resolve", self.remote_addr, None, self.params)
 
 def test_inet_conv():

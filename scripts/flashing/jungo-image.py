@@ -75,8 +75,7 @@ def get_flash_size():
 
     # now get flash size
     tn.write("cat /proc/mtd\n")
-    buf = tn.read_until("Returned 0", 3)
-    if buf:
+    if buf := tn.read_until("Returned 0", 3):
         i = buf.find('mtd0:')
         if i > 0:
             return int(buf[i+6:].split()[0],16)

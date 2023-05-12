@@ -98,7 +98,5 @@ class plain(object):
             return 7
         if head_type == 4:
             return 19
-        if head_type == 3:
-            return 4 + ord(buf[1])
-        return def_value
+        return 4 + ord(buf[1]) if head_type == 3 else def_value
 

@@ -35,12 +35,14 @@ class TransferBase(object):
 		#更新用户流量到数据库
 		last_transfer = self.last_update_transfer
 		curr_transfer = ServerPool.get_instance().get_servers_transfer()
-		#上次和本次的增量
-		dt_transfer = {}
-		for id in self.force_update_transfer: #此表中的用户统计上次未计入的流量
-			if id in self.last_get_transfer and id in last_transfer:
-				dt_transfer[id] = [self.last_get_transfer[id][0] - last_transfer[id][0], self.last_get_transfer[id][1] - last_transfer[id][1]]
-
+		dt_transfer = {
+			id: [
+				self.last_get_transfer[id][0] - last_transfer[id][0],
+				self.last_get_transfer[id][1] - last_transfer[id][1],
+			]
+			for id in self.force_update_transfer
+			if id in self.last_get_transfer and id in last_transfer
+		}
 		for id in curr_transfer.keys():
 			if id in self.force_update_transfer or id in self.mu_ports:
 				continue
@@ -50,9 +52,9 @@ class TransferBase(object):
 					continue
 				dt_transfer[id] = [curr_transfer[id][0] - last_transfer[id][0],
 								curr_transfer[id][1] - last_transfer[id][1]]
+			elif curr_transfer[id][0] + curr_transfer[id][1] <= 0:
+				continue
 			else:
-				if curr_transfer[id][0] + curr_transfer[id][1] <= 0:
-					continue
 				dt_transfer[id] = [curr_transfer[id][0], curr_transfer[id][1]]
 
 			#有流量的，先记录在线状态
@@ -109,23 +111,27 @@ class TransferBase(object):
 					cfg[name] = row[name]
 
 			merge_config_keys = ['password'] + read_config_keys
-			for name in cfg.keys():
-				if hasattr(cfg[name], 'encode'):
+			for name, value in cfg.items():
+				if hasattr(value, 'encode'):
 					try:
 						cfg[name] = cfg[name].encode('utf-8')
 					except Exception as e:
-						logging.warning('encode cfg key "%s" fail, val "%s"' % (name, cfg[name]))
+						logging.warning(f'encode cfg key "{name}" fail, val "{cfg[name]}"')
 
 			if port not in cur_servers:
 				cur_servers[port] = passwd
 			else:
-				logging.error('more than one user use the same port [%s]' % (port,))
+				logging.error(f'more than one user use the same port [{port}]')
 				continue
 
-			if 'protocol' in cfg and 'protocol_param' in cfg and common.to_str(cfg['protocol']) in obfs.mu_protocol():
-				if '#' in common.to_str(cfg['protocol_param']):
-					mu_servers[port] = passwd
-					allow = True
+			if (
+				'protocol' in cfg
+				and 'protocol_param' in cfg
+				and common.to_str(cfg['protocol']) in obfs.mu_protocol()
+				and '#' in common.to_str(cfg['protocol_param'])
+			):
+				mu_servers[port] = passwd
+				allow = True
 
 			if allow:
 				if port not in mu_servers:
@@ -148,42 +154,38 @@ class TransferBase(object):
 			if port in mu_servers:
 				if ServerPool.get_instance().server_is_run(port) > 0:
 					if cfgchange:
-						logging.info('db stop server at port [%s] reason: config changed: %s' % (port, cfg))
+						logging.info(f'db stop server at port [{port}] reason: config changed: {cfg}')
 						ServerPool.get_instance().cb_del_server(port)
 						self.force_update_transfer.add(port)
 						new_servers[port] = (passwd, cfg)
 				else:
 					self.new_server(port, passwd, cfg)
-			else:
-				if ServerPool.get_instance().server_is_run(port) > 0:
-					if config['additional_ports_only'] or not allow:
-						logging.info('db stop server at port [%s]' % (port,))
-						ServerPool.get_instance().cb_del_server(port)
-						self.force_update_transfer.add(port)
-					else:
-						if cfgchange:
-							logging.info('db stop server at port [%s] reason: config changed: %s' % (port, cfg))
-							ServerPool.get_instance().cb_del_server(port)
-							self.force_update_transfer.add(port)
-							new_servers[port] = (passwd, cfg)
+			elif ServerPool.get_instance().server_is_run(port) > 0:
+				if config['additional_ports_only'] or not allow:
+					logging.info(f'db stop server at port [{port}]')
+					ServerPool.get_instance().cb_del_server(port)
+					self.force_update_transfer.add(port)
+				elif cfgchange:
+					logging.info(f'db stop server at port [{port}] reason: config changed: {cfg}')
+					ServerPool.get_instance().cb_del_server(port)
+					self.force_update_transfer.add(port)
+					new_servers[port] = (passwd, cfg)
 
-				elif not config['additional_ports_only'] and allow and port > 0 and port < 65536 and ServerPool.get_instance().server_run_status(port) is False:
-					self.new_server(port, passwd, cfg)
+			elif not config['additional_ports_only'] and allow and port > 0 and port < 65536 and ServerPool.get_instance().server_run_status(port) is False:
+				self.new_server(port, passwd, cfg)
 
 		for row in last_rows:
-			if row['port'] in cur_servers:
-				pass
-			else:
-				logging.info('db stop server at port [%s] reason: port not exist' % (row['port']))
+			if row['port'] not in cur_servers:
+				logging.info(f"db stop server at port [{row['port']}] reason: port not exist")
 				ServerPool.get_instance().cb_del_server(row['port'])
 				self.clear_cache(row['port'])
 				if row['port'] in self.port_uid_table:
 					del self.port_uid_table[row['port']]
 
-		if len(new_servers) > 0:
+		if new_servers:
 			from shadowsocks import eventloop
 			self.event.wait(eventloop.TIMEOUT_PRECISION + eventloop.TIMEOUT_PRECISION / 2)
-			for port in new_servers.keys():
+			for port in new_servers:
 				passwd, cfg = new_servers[port]
 				self.new_server(port, passwd, cfg)
 
@@ -202,7 +204,9 @@ class TransferBase(object):
 		protocol = cfg.get('protocol', ServerPool.get_instance().config.get('protocol', 'origin'))
 		method = cfg.get('method', ServerPool.get_instance().config.get('method', 'None'))
 		obfs = cfg.get('obfs', ServerPool.get_instance().config.get('obfs', 'plain'))
-		logging.info('db start server at port [%s] pass [%s] protocol [%s] method [%s] obfs [%s]' % (port, passwd, protocol, method, obfs))
+		logging.info(
+			f'db start server at port [{port}] pass [{passwd}] protocol [{protocol}] method [{method}] obfs [{obfs}]'
+		)
 		ServerPool.get_instance().new_server(port, cfg)
 
 	def cmp(self, val1, val2):
@@ -214,10 +218,10 @@ class TransferBase(object):
 
 	@staticmethod
 	def del_servers():
-		for port in [v for v in ServerPool.get_instance().tcp_servers_pool.keys()]:
+		for port in list(ServerPool.get_instance().tcp_servers_pool.keys()):
 			if ServerPool.get_instance().server_is_run(port) > 0:
 				ServerPool.get_instance().cb_del_server(port)
-		for port in [v for v in ServerPool.get_instance().tcp_ipv6_servers_pool.keys()]:
+		for port in list(ServerPool.get_instance().tcp_ipv6_servers_pool.keys()):
 			if ServerPool.get_instance().server_is_run(port) > 0:
 				ServerPool.get_instance().cb_del_server(port)
 
@@ -309,7 +313,7 @@ class DbTransfer(TransferBase):
 	def update_all_user(self, dt_transfer):
 		import cymysql
 		update_transfer = {}
-		
+
 		query_head = 'UPDATE user'
 		query_sub_when = ''
 		query_sub_when2 = ''
@@ -326,21 +330,25 @@ class DbTransfer(TransferBase):
 			if id in self.user_pass:
 				del self.user_pass[id]
 
-			query_sub_when += ' WHEN %s THEN u+%s' % (id, int(transfer[0] * self.cfg["transfer_mul"]))
-			query_sub_when2 += ' WHEN %s THEN d+%s' % (id, int(transfer[1] * self.cfg["transfer_mul"]))
+			query_sub_when += (
+				f' WHEN {id} THEN u+{int(transfer[0] * self.cfg["transfer_mul"])}'
+			)
+			query_sub_when2 += (
+				f' WHEN {id} THEN d+{int(transfer[1] * self.cfg["transfer_mul"])}'
+			)
 			update_transfer[id] = transfer
 
 			if query_sub_in is not None:
-				query_sub_in += ',%s' % id
+				query_sub_in += f',{id}'
 			else:
-				query_sub_in = '%s' % id
+				query_sub_in = f'{id}'
 
 		if query_sub_when == '':
 			return update_transfer
-		query_sql = query_head + ' SET u = CASE port' + query_sub_when + \
-					' END, d = CASE port' + query_sub_when2 + \
-					' END, t = ' + str(int(last_time)) + \
-					' WHERE port IN (%s)' % query_sub_in
+		query_sql = (
+			f'{query_head} SET u = CASE port{query_sub_when} END, d = CASE port{query_sub_when2} END, t = {int(last_time)}'
+			+ f' WHERE port IN ({query_sub_in})'
+		)
 		if self.cfg["ssl_enable"] == 1:
 			conn = cymysql.connect(host=self.cfg["host"], port=self.cfg["port"],
 					user=self.cfg["user"], passwd=self.cfg["password"],
@@ -402,9 +410,7 @@ class DbTransfer(TransferBase):
 		cur.execute("SELECT " + ','.join(keys) + " FROM user")
 		rows = []
 		for r in cur.fetchall():
-			d = {}
-			for column in range(len(keys)):
-				d[keys[column]] = r[column]
+			d = {keys[column]: r[column] for column in range(len(keys))}
 			rows.append(d)
 		cur.close()
 		return rows
@@ -412,7 +418,7 @@ class DbTransfer(TransferBase):
 class Dbv3Transfer(DbTransfer):
 	def __init__(self):
 		super(Dbv3Transfer, self).__init__()
-		self.update_node_state = True if get_config().API_INTERFACE != 'legendsockssr' else False
+		self.update_node_state = get_config().API_INTERFACE != 'legendsockssr'
 		if self.update_node_state:
 			self.key_list += ['id']
 		self.key_list += ['method']

@@ -67,8 +67,7 @@ def load_openssl():
 
 def load_cipher(cipher_name):
     func_name = 'EVP_' + cipher_name.replace('-', '_')
-    cipher = getattr(libcrypto, func_name, None)
-    if cipher:
+    if cipher := getattr(libcrypto, func_name, None):
         cipher.restype = c_void_p
         return cipher()
     return None
@@ -91,7 +90,7 @@ class OpenSSLCrypto(object):
         if not cipher:
             cipher = load_cipher(cipher_name)
         if not cipher:
-            raise Exception('cipher %s not found in libcrypto' % cipher_name)
+            raise Exception(f'cipher {cipher_name} not found in libcrypto')
         key_ptr = c_char_p(key)
         iv_ptr = c_char_p(iv)
         self._ctx = libcrypto.EVP_CIPHER_CTX_new()

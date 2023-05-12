@@ -48,8 +48,7 @@ class Manager(object):
             if ':' in manager_address:
                 addr = manager_address.rsplit(':', 1)
                 addr = addr[0], int(addr[1])
-                addrs = socket.getaddrinfo(addr[0], addr[1])
-                if addrs:
+                if addrs := socket.getaddrinfo(addr[0], addr[1]):
                     family = addrs[0][0]
                 else:
                     logging.error('invalid address: %s', manager_address)
@@ -79,8 +78,7 @@ class Manager(object):
 
     def add_port(self, config):
         port = int(config['server_port'])
-        servers = self._relays.get(port, None)
-        if servers:
+        if servers := self._relays.get(port, None):
             logging.error("server already exists at %s:%d" % (config['server'],
                                                               port))
             return
@@ -95,8 +93,7 @@ class Manager(object):
 
     def remove_port(self, config):
         port = int(config['server_port'])
-        servers = self._relays.get(port, None)
-        if servers:
+        if servers := self._relays.get(port, None):
             logging.info("removing server at %s:%d" % (config['server'], port))
             t, u = servers
             t.close(next_tick=False)
@@ -107,28 +104,27 @@ class Manager(object):
                                                          port))
 
     def handle_event(self, sock, fd, event):
-        if sock == self._control_socket and event == eventloop.POLL_IN:
-            data, self._control_client_addr = sock.recvfrom(BUF_SIZE)
-            parsed = self._parse_command(data)
-            if parsed:
-                command, config = parsed
-                a_config = self._config.copy()
-                if config:
-                    # let the command override the configuration file
-                    a_config.update(config)
-                if 'server_port' not in a_config:
-                    logging.error('can not find server_port in config')
-                else:
-                    if command == 'add':
-                        self.add_port(a_config)
-                        self._send_control_data(b'ok')
-                    elif command == 'remove':
-                        self.remove_port(a_config)
-                        self._send_control_data(b'ok')
-                    elif command == 'ping':
-                        self._send_control_data(b'pong')
-                    else:
-                        logging.error('unknown command %s', command)
+        if sock != self._control_socket or event != eventloop.POLL_IN:
+            return
+        data, self._control_client_addr = sock.recvfrom(BUF_SIZE)
+        if parsed := self._parse_command(data):
+            command, config = parsed
+            a_config = self._config.copy()
+            if config:
+                # let the command override the configuration file
+                a_config.update(config)
+            if 'server_port' not in a_config:
+                logging.error('can not find server_port in config')
+            elif command == 'add':
+                self.add_port(a_config)
+                self._send_control_data(b'ok')
+            elif command == 'remove':
+                self.remove_port(a_config)
+                self._send_control_data(b'ok')
+            elif command == 'ping':
+                self._send_control_data(b'pong')
+            else:
+                logging.error('unknown command %s', command)
 
     def _parse_command(self, data):
         # commands:
@@ -168,7 +164,7 @@ class Manager(object):
                 send_data(r)
                 r.clear()
                 i = 0
-        if len(r) > 0 :
+        if r:
             send_data(r)
         self._statistics.clear()
 
@@ -181,10 +177,9 @@ class Manager(object):
                 if error_no in (errno.EAGAIN, errno.EINPROGRESS,
                                 errno.EWOULDBLOCK):
                     return
-                else:
-                    shell.print_exception(e)
-                    if self._config['verbose']:
-                        traceback.print_exc()
+                shell.print_exception(e)
+                if self._config['verbose']:
+                    traceback.print_exc()
 
     def run(self):
         self._loop.run()

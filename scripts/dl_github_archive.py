@@ -127,7 +127,7 @@ class Path(object):
         if len(dirs) == 1:
             return dirs[0]
         else:
-            raise PathException('untar %s: expecting a single subdir, got %s' % (path, dirs))
+            raise PathException(f'untar {path}: expecting a single subdir, got {dirs}')
 
     @staticmethod
     def tar(path, subdir, into=None, ts=None):
@@ -147,7 +147,7 @@ class Path(object):
             args.append('-z')
             envs['GZIP'] = '-n'
         else:
-            raise PathException('unknown compression type %s' % into)
+            raise PathException(f'unknown compression type {into}')
         subprocess.check_call(args, env=envs)
 
 
@@ -168,8 +168,7 @@ class GitHubCommitTsCache(object):
                 fcntl.lockf(fileno, fcntl.LOCK_SH)
                 self._cache_init(fin)
                 if k in self.cache:
-                    ts = self.cache[k][0]
-                    return ts
+                    return self.cache[k][0]
             finally:
                 fcntl.lockf(fileno, fcntl.LOCK_UN)
         return None
@@ -252,11 +251,11 @@ class DownloadGitHubTarball(object):
         self._init_commit_ts()
         with Path(TMPDIR_DL, keep=True) as dir_dl:
             # fetch tarball from GitHub
-            tarball_path = os.path.join(dir_dl.path, self.subdir + '.tar.gz.dl')
+            tarball_path = os.path.join(dir_dl.path, f'{self.subdir}.tar.gz.dl')
             with Path(tarball_path, isdir=False):
                 self._fetch(tarball_path)
                 # unpack
-                d = os.path.join(dir_dl.path, self.subdir + '.untar')
+                d = os.path.join(dir_dl.path, f'{self.subdir}.untar')
                 with Path(d, preclean=True) as dir_untar:
                     tarball_prefix = Path.untar(tarball_path, into=dir_untar.path)
                     dir0 = os.path.join(dir_untar.path, tarball_prefix)
@@ -290,7 +289,7 @@ class DownloadGitHubTarball(object):
     def _init_owner_repo(self):
         m = self.__repo_url_regex.search(self.url)
         if m is None:
-            raise self._error('Invalid github url: {}'.format(self.url))
+            raise self._error(f'Invalid github url: {self.url}')
         owner = m.group('owner')
         repo = m.group('repo')
         if repo.endswith('.git'):
@@ -311,13 +310,15 @@ class DownloadGitHubTarball(object):
     def _hash_check(self, f):
         with open(f, 'rb') as fin:
             while True:
-                d = fin.read(4096)
-                if not d:
+                if d := fin.read(4096):
+                    self.hasher.update(d)
+                else:
                     break
-                self.hasher.update(d)
         xhash = self.hasher.hexdigest()
         if xhash != self.xhash:
-            raise self._error('Wrong hash (probably caused by .gitattributes), expecting {}, got {}'.format(self.xhash, xhash))
+            raise self._error(
+                f'Wrong hash (probably caused by .gitattributes), expecting {self.xhash}, got {xhash}'
+            )
 
     def _init_commit_ts(self):
         if self.commit_ts is not None:
@@ -359,8 +360,8 @@ class DownloadGitHubTarball(object):
                 self.commit_ts_cache.set(url, ct)
                 return
             except Exception as e:
-                reasons += '\n' + ("  {}: {}".format(url, e))
-        raise self._error('Cannot fetch commit ts:{}'.format(reasons))
+                reasons += '\n' + f"  {url}: {e}"
+        raise self._error(f'Cannot fetch commit ts:{reasons}')
 
     def _init_commit_ts_remote_get(self, url, attrpath):
         resp = self._make_request(url)
@@ -370,8 +371,7 @@ class DownloadGitHubTarball(object):
             date = date[attr]
         date = datetime.datetime.strptime(date, '%Y-%m-%dT%H:%M:%SZ')
         date = date.timetuple()
-        ct = calendar.timegm(date)
-        return ct
+        return calendar.timegm(date)
 
     def _fetch(self, path):
         """Fetch tarball of the specified version ref."""
@@ -380,10 +380,10 @@ class DownloadGitHubTarball(object):
         resp = self._make_request(url)
         with open(path, 'wb') as fout:
             while True:
-                d = resp.read(4096)
-                if not d:
+                if d := resp.read(4096):
+                    fout.write(d)
+                else:
                     break
-                fout.write(d)
 
     def _make_repo_url_path(self, *args):
         url = '/repos/{0}/{1}'.format(self.owner, self.repo)
@@ -393,18 +393,17 @@ class DownloadGitHubTarball(object):
 
     def _make_request(self, path):
         """Request GitHub API endpoint on ``path``."""
-        url = 'https://api.github.com' + path
+        url = f'https://api.github.com{path}'
         headers = {
             'Accept': 'application/vnd.github.v3+json',
             'User-Agent': 'OpenWrt',
         }
         req = urllib.request.Request(url, headers=headers)
         sslcontext = ssl._create_unverified_context()
-        fileobj = urllib.request.urlopen(req, context=sslcontext)
-        return fileobj
+        return urllib.request.urlopen(req, context=sslcontext)
 
     def _error(self, msg):
-        return DownloadGitHubError('{}: {}'.format(self.source, msg))
+        return DownloadGitHubError(f'{self.source}: {msg}')
 
 
 def main():
@@ -420,8 +419,8 @@ def main():
         method = DownloadGitHubTarball(args)
         method.download()
     except Exception as ex:
-        sys.stderr.write('{}: Download from {} failed\n'.format(args.source, args.url))
-        sys.stderr.write('{}\n'.format(ex))
+        sys.stderr.write(f'{args.source}: Download from {args.url} failed\n')
+        sys.stderr.write(f'{ex}\n')
         sys.exit(1)
 
 if __name__ == '__main__':

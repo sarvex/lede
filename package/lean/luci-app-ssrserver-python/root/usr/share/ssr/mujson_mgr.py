@@ -75,10 +75,10 @@ class MuMgr(object):
 			if len(param) == 2:
 				for row in self.data.json:
 					if int(row['port']) == muid:
-						param = str(muid) + ':' + row['passwd']
+						param = f'{str(muid)}:' + row['passwd']
 						protocol_param = '/?protoparam=' + common.to_str(base64.urlsafe_b64encode(common.to_bytes(param))).replace("=", "")
 						break
-		link = ("%s:%s:%s:%s:%s:%s" % (self.server_addr, user['port'], protocol, user['method'], obfs, common.to_str(base64.urlsafe_b64encode(common.to_bytes(user['passwd']))).replace("=", ""))) + protocol_param
+		link = f"""{self.server_addr}:{user['port']}:{protocol}:{user['method']}:{obfs}:{common.to_str(base64.urlsafe_b64encode(common.to_bytes(user['passwd']))).replace("=", "")}{protocol_param}"""
 		return "ssr://" + (encode and common.to_str(base64.urlsafe_b64encode(common.to_bytes(link))).replace("=", "") or link)
 
 	def userinfo(self, user, muid = None):
@@ -94,7 +94,7 @@ class MuMgr(object):
 			if (muid is not None) and (key in ['protocol_param']):
 				for row in self.data.json:
 					if int(row['port']) == muid:
-						ret += "    %s : %s" % (key, str(muid) + ':' + row['passwd'])
+						ret += f"    {key} : {f'{str(muid)}:' + row['passwd']}"
 						break
 			elif key in ['transfer_enable', 'u', 'd']:
 				if muid is not None:
@@ -104,33 +104,45 @@ class MuMgr(object):
 							break
 				else:
 					val = user[key]
-				if val / 1024 < 4:
-					ret += "    %s : %s" % (key, val)
+				if val < 4096:
+					ret += f"    {key} : {val}"
 				elif val / 1024 ** 2 < 4:
 					val /= float(1024)
-					ret += "    %s : %s  K Bytes" % (key, val)
+					ret += f"    {key} : {val}  K Bytes"
 				elif val / 1024 ** 3 < 4:
 					val /= float(1024 ** 2)
-					ret += "    %s : %s  M Bytes" % (key, val)
+					ret += f"    {key} : {val}  M Bytes"
 				else:
 					val /= float(1024 ** 3)
-					ret += "    %s : %s  G Bytes" % (key, val)
+					ret += f"    {key} : {val}  G Bytes"
 			else:
-				ret += "    %s : %s" % (key, user[key])
+				ret += f"    {key} : {user[key]}"
 		ret += "\n    " + self.ssrlink(user, False, muid)
 		ret += "\n    " + self.ssrlink(user, True, muid)
 		return ret
 
 	def rand_pass(self):
-		return ''.join([random.choice('''ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789~-_=+(){}[]^&%$@''') for i in range(8)])
+		return ''.join(
+			[
+				random.choice(
+					'''ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789~-_=+(){}[]^&%$@'''
+				)
+				for _ in range(8)
+			]
+		)
 
 	def add(self, user):
-		up = {'enable': 1, 'u': 0, 'd': 0, 'method': "aes-128-ctr",
-		'protocol': "auth_aes128_md5",
-		'obfs': "tls1.2_ticket_auth_compatible",
-		'transfer_enable': 9007199254740992}
-		up['passwd'] = self.rand_pass()
-		up.update(user)
+		up = {
+			'enable': 1,
+			'u': 0,
+			'd': 0,
+			'method': "aes-128-ctr",
+			'protocol': "auth_aes128_md5",
+			'obfs': "tls1.2_ticket_auth_compatible",
+			'transfer_enable': 9007199254740992,
+			'passwd': self.rand_pass(),
+		}
+		up |= user
 
 		self.data.load(self.config_path)
 		for row in self.data.json:
@@ -140,10 +152,10 @@ class MuMgr(object):
 			if 'port' in user and row['port'] == user['port']:
 				match = True
 			if match:
-				print("user [%s] port [%s] already exist" % (row['user'], row['port']))
+				print(f"user [{row['user']}] port [{row['port']}] already exist")
 				return
 		self.data.json.append(up)
-		print("### add user info %s" % self.userinfo(up))
+		print(f"### add user info {self.userinfo(up)}")
 		self.data.save(self.config_path)
 
 	def edit(self, user):
@@ -155,9 +167,9 @@ class MuMgr(object):
 			if 'port' in user and row['port'] != user['port']:
 				match = False
 			if match:
-				print("edit user [%s]" % (row['user'],))
+				print(f"edit user [{row['user']}]")
 				row.update(user)
-				print("### new user info %s" % self.userinfo(row))
+				print(f"### new user info {self.userinfo(row)}")
 				break
 		self.data.save(self.config_path)
 
@@ -171,7 +183,7 @@ class MuMgr(object):
 			if 'port' in user and row['port'] != user['port']:
 				match = False
 			if match:
-				print("delete user [%s]" % row['user'])
+				print(f"delete user [{row['user']}]")
 				del self.data.json[index]
 				break
 			index += 1
@@ -188,14 +200,14 @@ class MuMgr(object):
 				match = False
 			if match:
 				row.update(up)
-				print("clear user [%s]" % row['user'])
+				print(f"clear user [{row['user']}]")
 		self.data.save(self.config_path)
 
 	def list_user(self, user):
 		self.data.load(self.config_path)
 		if not user:
 			for row in self.data.json:
-				print("user [%s] port %s" % (row['user'], row['port']))
+				print(f"user [{row['user']}] port {row['port']}")
 			return
 		for row in self.data.json:
 			match = True
@@ -207,7 +219,7 @@ class MuMgr(object):
 				muid = None
 				if 'muid' in user:
 					muid = user['muid']
-				print("### user [%s] info %s" % (row['user'], self.userinfo(row, muid)))
+				print(f"### user [{row['user']}] info {self.userinfo(row, muid)}")
 
 
 def print_server_help():
@@ -291,15 +303,9 @@ def main():
 			elif key == '-k':
 				user['passwd'] = value
 			elif key == '-o':
-				if value in fast_set_obfs:
-					user['obfs'] = fast_set_obfs[value]
-				else:
-					user['obfs'] = value
+				user['obfs'] = fast_set_obfs.get(value, value)
 			elif key == '-O':
-				if value in fast_set_protocol:
-					user['protocol'] = fast_set_protocol[value]
-				else:
-					user['protocol'] = value
+				user['protocol'] = fast_set_protocol.get(value, value)
 			elif key == '-g':
 				user['obfs_param'] = value
 			elif key == '-G':
@@ -309,10 +315,7 @@ def main():
 			elif key == '-S':
 				user['speed_limit_per_user'] = int(value)
 			elif key == '-m':
-				if value in fast_set_method:
-					user['method'] = fast_set_method[value]
-				else:
-					user['method'] = value
+				user['method'] = fast_set_method.get(value, value)
 			elif key == '-f':
 				user['forbidden_port'] = value
 			elif key == '-t':

@@ -27,7 +27,7 @@ from shadowsocks.obfsplugin import plain, http_simple, obfs_tls, verify, auth, a
 
 
 method_supported = {}
-method_supported.update(plain.obfs_map)
+method_supported |= plain.obfs_map
 method_supported.update(http_simple.obfs_map)
 method_supported.update(obfs_tls.obfs_map)
 method_supported.update(verify.obfs_map)
@@ -49,7 +49,7 @@ class obfs(object):
         if self._method_info:
             self.obfs = self.get_obfs(method)
         else:
-            raise Exception('obfs plugin [%s] not supported' % method)
+            raise Exception(f'obfs plugin [{method}] not supported')
 
     def init_data(self):
         return self.obfs.init_data()
@@ -62,8 +62,7 @@ class obfs(object):
 
     def get_method_info(self, method):
         method = method.lower()
-        m = method_supported.get(method)
-        return m
+        return method_supported.get(method)
 
     def get_obfs(self, method):
         m = self._method_info

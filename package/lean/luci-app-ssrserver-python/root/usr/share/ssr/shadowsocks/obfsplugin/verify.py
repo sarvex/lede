@@ -44,10 +44,7 @@ obfs_map = {
 }
 
 def match_begin(str1, str2):
-    if len(str1) >= len(str2):
-        if str1[:len(str2)] == str2:
-            return True
-    return False
+    return len(str1) >= len(str2) and str1[:len(str2)] == str2
 
 class obfs_verify_data(object):
     def __init__(self):

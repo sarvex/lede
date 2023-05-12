@@ -89,21 +89,15 @@ class ServerPool(object):
 
 	def server_is_run(self, port):
 		port = int(port)
-		ret = 0
-		if port in self.tcp_servers_pool:
-			ret = 1
+		ret = 1 if port in self.tcp_servers_pool else 0
 		if port in self.tcp_ipv6_servers_pool:
 			ret |= 2
 		return ret
 
 	def server_run_status(self, port):
-		if 'server' in self.config:
-			if port not in self.tcp_servers_pool:
-				return False
-		if 'server_ipv6' in self.config:
-			if port not in self.tcp_ipv6_servers_pool:
-				return False
-		return True
+		if 'server' in self.config and port not in self.tcp_servers_pool:
+			return False
+		return 'server_ipv6' not in self.config or port in self.tcp_ipv6_servers_pool
 
 	def new_server(self, port, user_config):
 		ret = True
@@ -137,7 +131,7 @@ class ServerPool(object):
 					if common.to_str(a_config['server_ipv6']) == "::":
 						ipv6_ok = True
 				except Exception as e:
-					logging.warn("IPV6 %s " % (e,))
+					logging.warn(f"IPV6 {e} ")
 
 		if 'server' in self.config:
 			if port in self.tcp_servers_pool:
@@ -162,7 +156,7 @@ class ServerPool(object):
 
 				except Exception as e:
 					if not ipv6_ok:
-						logging.warn("IPV4 %s " % (e,))
+						logging.warn(f"IPV4 {e} ")
 
 		return True
 
@@ -171,7 +165,10 @@ class ServerPool(object):
 		logging.info("del server at %d" % port)
 		try:
 			udpsock = socket(AF_INET, SOCK_DGRAM)
-			udpsock.sendto('%s:%s:0:0' % (get_config().MANAGE_PASS, port), (get_config().MANAGE_BIND_IP, get_config().MANAGE_PORT))
+			udpsock.sendto(
+				f'{get_config().MANAGE_PASS}:{port}:0:0',
+				(get_config().MANAGE_BIND_IP, get_config().MANAGE_PORT),
+			)
 			udpsock.close()
 		except Exception as e:
 			logging.warn(e)
@@ -274,9 +271,7 @@ class ServerPool(object):
 		servers.update(self.tcp_ipv6_servers_pool)
 		servers.update(self.udp_servers_pool)
 		servers.update(self.udp_ipv6_servers_pool)
-		ret = {}
-		for port in servers.keys():
-			ret[port] = self.get_server_transfer(port)
+		ret = {port: self.get_server_transfer(port) for port in servers.keys()}
 		for port in self.tcp_servers_pool:
 			u, d = self.get_server_mu_transfer(self.tcp_servers_pool[port])
 			self.update_mu_transfer(ret, u, d)

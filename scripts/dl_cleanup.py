@@ -32,10 +32,7 @@ def parseVer_123(match, filepath):
 		patchlevel = match.group(5)
 	except IndexError as e:
 		patchlevel = None
-	if patchlevel:
-		patchlevel = ord(patchlevel[0])
-	else:
-		patchlevel = 0
+	patchlevel = ord(patchlevel[0]) if patchlevel else 0
 	progversion = (int(match.group(2)) << 64) |\
 		      (int(match.group(3)) << 48) |\
 		      (int(match.group(4)) << 32) |\
@@ -48,10 +45,7 @@ def parseVer_12(match, filepath):
 		patchlevel = match.group(4)
 	except IndexError as e:
 		patchlevel = None
-	if patchlevel:
-		patchlevel = ord(patchlevel[0])
-	else:
-		patchlevel = 0
+	patchlevel = ord(patchlevel[0]) if patchlevel else 0
 	progversion = (int(match.group(2)) << 64) |\
 		      (int(match.group(3)) << 48) |\
 		      patchlevel
@@ -119,24 +113,24 @@ class Entry:
 
 		for ext in extensions:
 			if filename.endswith(ext):
-				filename = filename[0:0-len(ext)]
+				filename = filename[:0-len(ext)]
 				self.fileext = ext
 				break
 		else:
 			print(self.filename, "has an unknown file-extension")
 			raise EntryParseError("ext")
 		for (regex, parseVersion) in versionRegex:
-			match = regex.match(filename)
-			if match:
+			if match := regex.match(filename):
 				(self.progname, self.version) = parseVersion(
-					match, directory + "/" + filename + self.fileext)
+					match, f"{directory}/{filename}{self.fileext}"
+				)
 				break
 		else:
 			print(self.filename, "has an unknown version pattern")
 			raise EntryParseError("ver")
 
 	def getPath(self):
-		return (self.directory + "/" + self.filename).replace("//", "/")
+		return f"{self.directory}/{self.filename}".replace("//", "/")
 
 	def deleteFile(self):
 		path = self.getPath()
@@ -149,7 +143,7 @@ class Entry:
 
 def usage():
 	print("OpenWrt download directory cleanup utility")
-	print("Usage: " + sys.argv[0] + " [OPTIONS] <path/to/dl>")
+	print(f"Usage: {sys.argv[0]} [OPTIONS] <path/to/dl>")
 	print("")
 	print(" -d|--dry-run            Do a dry-run. Don't delete any files")
 	print(" -B|--show-blacklist     Show the blacklist and exit")
@@ -195,13 +189,13 @@ def main(argv):
 				sep = "\t\t"
 				if len(name) >= 8:
 					sep = "\t"
-				print("%s%s(%s)" % (name, sep, regex.pattern))
+				print(f"{name}{sep}({regex.pattern})")
 			return 0
 
 	# Create a directory listing and parse the file names.
 	entries = []
 	for filename in os.listdir(directory):
-		if filename == "." or filename == "..":
+		if filename in [".", ".."]:
 			continue
 		for (name, regex) in blacklist:
 			if regex.match(filename):
@@ -217,15 +211,14 @@ def main(argv):
 	# Create a map of programs
 	progmap = {}
 	for entry in entries:
-		if entry.progname in progmap.keys():
+		if entry.progname in progmap:
 			progmap[entry.progname].append(entry)
 		else:
 			progmap[entry.progname] = [entry,]
 
 	# Traverse the program map and delete everything but the last version
-	for prog in progmap:
+	for prog, versions in progmap.items():
 		lastVersion = None
-		versions = progmap[prog]
 		for version in versions:
 			if lastVersion is None or version >= lastVersion:
 				lastVersion = version

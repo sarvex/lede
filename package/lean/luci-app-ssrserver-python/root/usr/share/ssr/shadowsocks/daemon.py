@@ -29,25 +29,26 @@ from shadowsocks import common, shell
 
 
 def daemon_exec(config):
-    if 'daemon' in config:
-        if os.name != 'posix':
-            raise Exception('daemon mode is only supported on Unix')
-        command = config['daemon']
-        if not command:
-            command = 'start'
-        pid_file = config['pid-file']
-        log_file = config['log-file']
-        if command == 'start':
-            daemon_start(pid_file, log_file)
-        elif command == 'stop':
-            daemon_stop(pid_file)
-            # always exit after daemon_stop
-            sys.exit(0)
-        elif command == 'restart':
-            daemon_stop(pid_file)
-            daemon_start(pid_file, log_file)
-        else:
-            raise Exception('unsupported daemon command %s' % command)
+    if 'daemon' not in config:
+        return
+    if os.name != 'posix':
+        raise Exception('daemon mode is only supported on Unix')
+    command = config['daemon']
+    if not command:
+        command = 'start'
+    pid_file = config['pid-file']
+    log_file = config['log-file']
+    if command == 'restart':
+        daemon_stop(pid_file)
+        daemon_start(pid_file, log_file)
+    elif command == 'start':
+        daemon_start(pid_file, log_file)
+    elif command == 'stop':
+        daemon_stop(pid_file)
+        # always exit after daemon_stop
+        sys.exit(0)
+    else:
+        raise Exception(f'unsupported daemon command {command}')
 
 
 def write_pid_file(pid_file, pid):
@@ -70,9 +71,8 @@ def write_pid_file(pid_file, pid):
     try:
         fcntl.lockf(fd, fcntl.LOCK_EX | fcntl.LOCK_NB, 0, 0, os.SEEK_SET)
     except IOError:
-        r = os.read(fd, 32)
-        if r:
-            logging.error('already started at pid %s' % common.to_str(r))
+        if r := os.read(fd, 32):
+            logging.error(f'already started at pid {common.to_str(r)}')
         else:
             logging.error('already started')
         os.close(fd)
@@ -186,7 +186,7 @@ def set_user(username):
     try:
         pwrec = pwd.getpwnam(username)
     except KeyError:
-        logging.error('user not found: %s' % username)
+        logging.error(f'user not found: {username}')
         raise
     user = pwrec[0]
     uid = pwrec[2]

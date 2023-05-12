@@ -5,14 +5,14 @@ import os
 import struct
 
 def create_header(args, size):
-	header = struct.pack('32s32s32s32s32s',
+	return struct.pack(
+		'32s32s32s32s32s',
 		args.part_name.encode('ascii'),
 		str(size).encode('ascii'),
 		args.part_version.encode('ascii'),
 		"".encode('ascii'),
-		args.rootfs_version.encode('ascii'))
-
-	return header
+		args.rootfs_version.encode('ascii'),
+	)
 
 def create_output(args):
 	in_st = os.stat(args.input_file)
@@ -21,14 +21,11 @@ def create_output(args):
 	header = create_header(args, in_size)
 	print(header)
 
-	in_f = open(args.input_file, 'r+b')
-	in_bytes = in_f.read(in_size)
-	in_f.close()
-
-	out_f = open(args.output_file, 'w+b')
-	out_f.write(header)
-	out_f.write(in_bytes)
-	out_f.close()
+	with open(args.input_file, 'r+b') as in_f:
+		in_bytes = in_f.read(in_size)
+	with open(args.output_file, 'w+b') as out_f:
+		out_f.write(header)
+		out_f.write(in_bytes)
 
 def main():
 	global args

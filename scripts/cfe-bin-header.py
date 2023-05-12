@@ -8,8 +8,7 @@ def auto_int(x):
 	return int(x, 0)
 
 def create_header(args, size):
-	header = struct.pack('>III', args.entry_addr, args.load_addr, size)
-	return header
+	return struct.pack('>III', args.entry_addr, args.load_addr, size)
 
 def create_output(args):
 	in_st = os.stat(args.input_file)
@@ -18,14 +17,11 @@ def create_output(args):
 	header = create_header(args, in_size)
 	print(header)
 
-	in_f = open(args.input_file, 'r+b')
-	in_bytes = in_f.read(in_size)
-	in_f.close()
-
-	out_f = open(args.output_file, 'w+b')
-	out_f.write(header)
-	out_f.write(in_bytes)
-	out_f.close()
+	with open(args.input_file, 'r+b') as in_f:
+		in_bytes = in_f.read(in_size)
+	with open(args.output_file, 'w+b') as out_f:
+		out_f.write(header)
+		out_f.write(in_bytes)
 
 def main():
 	global args

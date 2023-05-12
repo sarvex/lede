@@ -108,8 +108,7 @@ class SpeedTester(object):
         if self.max_speed > 0:
             cut_t = time.time()
             self.sum_len -= (cut_t - self.last_time) * self.max_speed
-            if self.sum_len < 0:
-                self.sum_len = 0
+            self.sum_len = max(self.sum_len, 0)
             self.last_time = cut_t
             self.sum_len += data_len
 
@@ -117,8 +116,7 @@ class SpeedTester(object):
         if self.max_speed > 0:
             cut_t = time.time()
             self.sum_len -= (cut_t - self.last_time) * self.max_speed
-            if self.sum_len < 0:
-                self.sum_len = 0
+            self.sum_len = max(self.sum_len, 0)
             self.last_time = cut_t
             return self.sum_len >= self.max_speed
         return False

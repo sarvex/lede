@@ -7,9 +7,7 @@ import os
 import struct
 
 def create_header(key, version, iv, random, size):
-	header = struct.pack('32s32s32s32s32s', key, version, iv, random, size)
-
-	return header
+	return struct.pack('32s32s32s32s32s', key, version, iv, random, size)
 
 def create_output(args):
 	in_st = os.stat(args.input_file)
@@ -22,10 +20,8 @@ def create_output(args):
 	size = str(in_size).encode('ascii')
 	header = create_header(key, version, iv, random, size)
 
-	out_f = open(args.output_file, 'w+b')
-	out_f.write(header)
-	out_f.close()
-
+	with open(args.output_file, 'w+b') as out_f:
+		out_f.write(header)
 	md5 = hashlib.md5()
 	md5.update(header[0x60:0x80])
 	md5.update(header[0x20:0x40])
@@ -38,10 +34,8 @@ def create_output(args):
 
 	key = md5_1 + md5_2
 
-	key_f = open(args.key_file, 'w+b')
-	key_f.write(binascii.hexlify(bytearray(key)))
-	key_f.close()
-
+	with open(args.key_file, 'w+b') as key_f:
+		key_f.write(binascii.hexlify(bytearray(key)))
 	print("AES 256 CBC Key:", binascii.hexlify(bytearray(key)))
 
 def main():

@@ -50,10 +50,7 @@ obfs_map = {
 }
 
 def match_begin(str1, str2):
-    if len(str1) >= len(str2):
-        if str1[:len(str2)] == str2:
-            return True
-    return False
+    return len(str1) >= len(str2) and str1[:len(str2)] == str2
 
 class http_simple(plain.plain):
     def __init__(self, method):
@@ -79,9 +76,7 @@ class http_simple(plain.plain):
 
     def encode_head(self, buf):
         hexstr = binascii.hexlify(buf)
-        chs = []
-        for i in range(0, len(hexstr), 2):
-            chs.append(b"%" + hexstr[i:i+2])
+        chs = [b"%" + hexstr[i:i+2] for i in range(0, len(hexstr), 2)]
         return b''.join(chs)
 
     def client_encode(self, buf):
@@ -144,7 +139,7 @@ class http_simple(plain.plain):
             if hex_items and len(hex_items) > 1:
                 for index in range(1, len(hex_items)):
                     if len(hex_items[index]) < 2:
-                        ret_buf += binascii.unhexlify('0' + hex_items[index])
+                        ret_buf += binascii.unhexlify(f'0{hex_items[index]}')
                         break
                     elif len(hex_items[index]) > 2:
                         ret_buf += binascii.unhexlify(hex_items[index][:2])
@@ -180,47 +175,54 @@ class http_simple(plain.plain):
 
         self.recv_buffer += buf
         buf = self.recv_buffer
-        if len(buf) > 10:
-            if match_begin(buf, b'GET ') or match_begin(buf, b'POST '):
-                if len(buf) > 65536:
-                    self.recv_buffer = None
-                    logging.warn('http_simple: over size')
-                    return self.not_match_return(buf)
-            else: #not http header, run on original protocol
-                self.recv_buffer = None
-                logging.debug('http_simple: not match begin')
-                return self.not_match_return(buf)
-        else:
+        if len(buf) <= 10:
             return (b'', True, False)
 
-        if b'\r\n\r\n' in buf:
-            datas = buf.split(b'\r\n\r\n', 1)
-            ret_buf = self.get_data_from_http_header(buf)
-            host = self.get_host_from_http_header(buf)
-            if host and self.server_info.obfs_param:
-                pos = host.find(":")
-                if pos >= 0:
-                    host = host[:pos]
-                hosts = self.server_info.obfs_param.split(',')
-                if host not in hosts:
-                    return self.not_match_return(buf)
-            if len(ret_buf) < 4:
-                return self.error_return(buf)
-            if len(datas) > 1:
-                ret_buf += datas[1]
-            if len(ret_buf) >= 13:
-                self.has_recv_header = True
-                return (ret_buf, True, False)
+        if match_begin(buf, b'GET ') or match_begin(buf, b'POST '):
+            if len(buf) > 65536:
+                self.recv_buffer = None
+                logging.warn('http_simple: over size')
+                return self.not_match_return(buf)
+        else: #not http header, run on original protocol
+            self.recv_buffer = None
+            logging.debug('http_simple: not match begin')
             return self.not_match_return(buf)
-        else:
+        if b'\r\n\r\n' not in buf:
             return (b'', True, False)
+        datas = buf.split(b'\r\n\r\n', 1)
+        ret_buf = self.get_data_from_http_header(buf)
+        host = self.get_host_from_http_header(buf)
+        if host and self.server_info.obfs_param:
+            pos = host.find(":")
+            if pos >= 0:
+                host = host[:pos]
+            hosts = self.server_info.obfs_param.split(',')
+            if host not in hosts:
+                return self.not_match_return(buf)
+        if len(ret_buf) < 4:
+            return self.error_return(buf)
+        if len(datas) > 1:
+            ret_buf += datas[1]
+        if len(ret_buf) >= 13:
+            self.has_recv_header = True
+            return (ret_buf, True, False)
+        return self.not_match_return(buf)
 
 class http_post(http_simple):
     def __init__(self, method):
         super(http_post, self).__init__(method)
 
     def boundary(self):
-        return to_bytes(''.join([random.choice("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789") for i in range(32)]))
+        return to_bytes(
+            ''.join(
+                [
+                    random.choice(
+                        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+                    )
+                    for _ in range(32)
+                ]
+            )
+        )
 
     def client_encode(self, buf):
         if self.has_sent_header:

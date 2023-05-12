@@ -22,13 +22,10 @@ if __name__ == '__main__':
     class MainHandler(tornado.web.RequestHandler):
         def get(self, project):
             try:
-                with open('/tmp/%s-coverage' % project, 'rb') as f:
+                with open(f'/tmp/{project}-coverage', 'rb') as f:
                     coverage = f.read().strip()
                     n = int(coverage.strip('%'))
-                    if n >= 80:
-                        color = 'brightgreen'
-                    else:
-                        color = 'yellow'
+                    color = 'brightgreen' if n >= 80 else 'yellow'
                     self.redirect(('https://img.shields.io/badge/'
                                    'coverage-%s-%s.svg'
                                    '?style=flat') %

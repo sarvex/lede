@@ -27,7 +27,7 @@ from shadowsocks.crypto import rc4_md5, openssl, sodium, table
 
 
 method_supported = {}
-method_supported.update(rc4_md5.ciphers)
+method_supported |= rc4_md5.ciphers
 method_supported.update(openssl.ciphers)
 method_supported.update(sodium.ciphers)
 method_supported.update(table.ciphers)
@@ -52,8 +52,7 @@ def EVP_BytesToKey(password, key_len, iv_len):
     if hasattr(password, 'encode'):
         password = password.encode('utf-8')
     cached_key = '%s-%d-%d' % (password, key_len, iv_len)
-    r = cached_keys.get(cached_key, None)
-    if r:
+    if r := cached_keys.get(cached_key, None):
         return r
     m = []
     i = 0
@@ -91,13 +90,12 @@ class Encryptor(object):
             else:
                 self.cipher = self.get_cipher(key, method, 1, iv)
         else:
-            logging.error('method %s not supported' % method)
+            logging.error(f'method {method} not supported')
             sys.exit(1)
 
     def get_method_info(self, method):
         method = method.lower()
-        m = method_supported.get(method)
-        return m
+        return method_supported.get(method)
 
     def iv_len(self):
         return len(self.cipher_iv)
@@ -123,9 +121,8 @@ class Encryptor(object):
             return buf
         if self.iv_sent:
             return self.cipher.update(buf)
-        else:
-            self.iv_sent = True
-            return self.cipher_iv + self.cipher.update(buf)
+        self.iv_sent = True
+        return self.cipher_iv + self.cipher.update(buf)
 
     def decrypt(self, buf):
         if len(buf) == 0:
